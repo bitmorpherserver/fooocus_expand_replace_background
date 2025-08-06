@@ -1,0 +1,15 @@
+[Unit]
+Description=Fooocus_object_replace.service - A FastApi application for object replace using Fooocus-api  project by mrhan1993 
+After=network.target
+
+[Service]
+Environment="PATH=/home/evobits/Foocus_ObjectReplace/.venv/bin"
+WorkingDirectory=/home/evobits/Foocus_ObjectReplace/
+
+
+ExecStart=/home/evobits/Foocus_ObjectReplace/.venv/bin/python /home/evobits/Foocus_ObjectReplace/main.py
+StandardOutput=append:/var/log/foocus_object_replace/access.log
+StandardError=append:/var/log/foocus_object_replace/error.log
+
+[Install]
+WantedBy=multi-user.target
