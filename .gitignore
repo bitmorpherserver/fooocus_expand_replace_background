@@ -23,6 +23,7 @@ venv
 .env
 .conda
 conda
+shanto
 
 # log files
 *.log

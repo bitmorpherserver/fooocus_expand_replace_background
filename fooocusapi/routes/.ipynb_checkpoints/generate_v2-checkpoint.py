@@ -404,7 +404,8 @@ def get_save_img_directory(directory_name):
 
 
 @secure_router.post(
-        path="/v2/generation/image-inpaint-outpaint-expand",
+        # path="/v2/generation/image-inpaint-outpaint-expand",
+        path="/ai/api/v1/ai_expand",
         response_model=List[GeneratedImageResult] | AsyncJobResponse,
         responses=img_generate_responses,
         tags=["GenerateV2"])
@@ -425,14 +426,24 @@ def img_Expand(
     """
     if accept_query is not None and len(accept_query) > 0:
         accept = accept_query
-
+    outpaint_selections=[]
+    if(req_obj.left!=-1) and (req_obj.left!=0):
+        outpaint_selections.append(OutpaintExpansion("Left"))
+    if(req_obj.right!=-1) and (req_obj.right!=0):
+        outpaint_selections.append(OutpaintExpansion("Right"))
+    if(req_obj.top!=-1) and (req_obj.top!=0):
+        outpaint_selections.append(OutpaintExpansion("Top"))
+    if(req_obj.bottom!=-1) and (req_obj.bottom!=0):
+        outpaint_selections.append(OutpaintExpansion("Bottom"))
+        
+    
     req = ImgInpaintOrOutpaintRequestJson(
         input_image = req_obj.image,
-        outpaint_selections = [OutpaintExpansion("Left"),OutpaintExpansion("Right"),OutpaintExpansion("Top"),OutpaintExpansion("Bottom") ],
-        outpaint_distance_left = -1,
-        outpaint_distance_right = -1,
-        outpaint_distance_top = -1,
-        outpaint_distance_bottom = -1,
+        outpaint_selections = outpaint_selections,
+        outpaint_distance_left = req_obj.left,
+        outpaint_distance_right = req_obj.right,
+        outpaint_distance_top = req_obj.top,
+        outpaint_distance_bottom = req_obj.bottom,
     )
 
 
