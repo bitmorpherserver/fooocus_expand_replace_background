@@ -28,6 +28,7 @@ from fooocusapi.models.requests_v2 import (
     ImageEnhanceRequestJson, ImgInpaintOrOutpaintRequestJson,
     ImgPromptRequestJson,
     Text2ImgRequestWithPrompt,
+    OutpaintExpansion,AiExpand,
     ImgUpscaleOrVaryRequestJson, ObjectReplaceRequestJson, BackgroundGeneration
 )
 from fooocusapi.models.common.response import (
@@ -399,13 +400,16 @@ def get_save_img_directory(directory_name):
     return img_directory
 
 
+
+
+
 @secure_router.post(
-        path="/v2/generation/image-inpaint-outpaint",
+        path="/v2/generation/image-inpaint-outpaint-expand",
         response_model=List[GeneratedImageResult] | AsyncJobResponse,
         responses=img_generate_responses,
         tags=["GenerateV2"])
 def img_Expand(
-    req: ImgInpaintOrOutpaintRequestJson,
+    req_obj: AiExpand,
     accept: str = Header(None),
     accept_query: str | None = Query(
         None, alias='accept',
@@ -422,6 +426,17 @@ def img_Expand(
     if accept_query is not None and len(accept_query) > 0:
         accept = accept_query
 
+    req = ImgInpaintOrOutpaintRequestJson(
+        input_image = req_obj.image,
+        outpaint_selections = [OutpaintExpansion("Left"),OutpaintExpansion("Right"),OutpaintExpansion("Top"),OutpaintExpansion("Bottom") ],
+        outpaint_distance_left = -1,
+        outpaint_distance_right = -1,
+        outpaint_distance_top = -1,
+        outpaint_distance_bottom = -1,
+    )
+
+
+    
     req.input_image = base64_to_stream(req.input_image)
     if req.input_mask is not None:
         req.input_mask = base64_to_stream(req.input_mask)
@@ -440,6 +455,12 @@ def img_Expand(
     req.image_prompts = image_prompts_files
 
     return call_worker(req, accept)
+
+
+
+
+
+
 
 @secure_router.post(
         path="/v2/generation/image-prompt",

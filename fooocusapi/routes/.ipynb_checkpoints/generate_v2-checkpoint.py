@@ -1,6 +1,13 @@
 """Generate API V2 routes
 
 """
+
+from fooocusapi.models.common.base import (
+    PerformanceSelection,
+    Lora,
+    default_loras_model
+)
+
 import time
 import base64
 import shutil
@@ -21,6 +28,7 @@ from fooocusapi.models.requests_v2 import (
     ImageEnhanceRequestJson, ImgInpaintOrOutpaintRequestJson,
     ImgPromptRequestJson,
     Text2ImgRequestWithPrompt,
+    OutpaintExpansion,AiExpand,
     ImgUpscaleOrVaryRequestJson, ObjectReplaceRequestJson, BackgroundGeneration
 )
 from fooocusapi.models.common.response import (
@@ -38,6 +46,9 @@ from fooocusapi.configs.default import img_generate_responses
 secure_router = APIRouter(
     dependencies=[Depends(api_key_auth)]
 )
+
+
+user_directory= "/evobits/"  #    for evobits machine   user_directory=   "/evobits/"
 
 
 @secure_router.post(
@@ -190,14 +201,23 @@ def img_background_change(
     """
     if accept_query is not None and len(accept_query) > 0:
         accept = accept_query
+
+# --- Add default prompt if user does not provide one ---
+    DEFAULT_PROMPT = "A highly detailed and realistic scene, beautifully composed,background only, no people, no objects"
+    if not req_obj.prompt or req_obj.prompt.strip() == "":
+        req_obj.prompt = DEFAULT_PROMPT
+        
     # GenerateMaskRequest
     start = time.time()
     generate_mask= GenerateMaskRequest(
         image= req_obj.image
     )
     masked_image=  gm(request=generate_mask)
-    
+    print(true_performance_selection("speed"))
+    performance_selection=true_performance_selection(req_obj.steps)
+
     mask_time = time.time()
+    # performance = Performance
     # print(masked_image)
     req = ImgInpaintOrOutpaintRequestJson(
         input_image = req_obj.image,
@@ -206,11 +226,9 @@ def img_background_change(
         inpaint_additional_prompt = '',
         outpaint_selections = [],
         image_number= req_obj.image_count,
-        outpaint_distance_left = -1,
-        outpaint_distance_right = -1,
-        outpaint_distance_top = -1,
-        outpaint_distance_bottom = -1,
         image_prompts = [],
+        performance_selection= performance_selection,
+        guidance_scale=req_obj.guidance_scale,
         advanced_params = AdvancedParams(invert_mask_checkbox=True)
 
     )
@@ -245,7 +263,7 @@ def img_background_change(
         image_name = remove_baseUrl(image.url)
     
         print(len(primary_response))
-        local_output_image_path = "/home/fooocus_ai_background/outputs" + remove_baseUrl(image.url)
+        local_output_image_path = f"/home{user_directory}fooocus_ai_background/outputs" + remove_baseUrl(image.url)
         new_out_images_directory_name = '/ai_background/'
         new_local_out_image_directory = get_save_img_directory(new_out_images_directory_name)
         new_local_out_image_path =  new_local_out_image_directory + image_name
@@ -266,13 +284,23 @@ def img_background_change(
     return JSONResponse(content=response_data, status_code=200)
 
 
+def true_performance_selection(performance :str) -> PerformanceSelection:
+    if performance=="speed" :
+        return PerformanceSelection.extreme_speed
+    elif performance=="quality":
+        return PerformanceSelection.speed
+    elif performance=="extreme_quality":
+        return PerformanceSelection.quality        
+
+
+
 
 @secure_router.post(
         path="/ai/api/v1/object_replace",
         response_model=List[GeneratedImageResult] | AsyncJobResponse,
         responses=img_generate_responses,
         tags=["GenerateV2"])
-def img_inpaint_or_outpaint(
+def object_replace(
     req_obj: ObjectReplaceRequestJson,
     #req: ImgInpaintOrOutpaintRequestJson,
     accept: str = Header(None),
@@ -290,6 +318,7 @@ def img_inpaint_or_outpaint(
     """
     if accept_query is not None and len(accept_query) > 0:
         accept = accept_query
+    performance_selection=true_performance_selection(req_obj.steps)
 
     req = ImgInpaintOrOutpaintRequestJson(
         input_image = req_obj.image,
@@ -301,7 +330,9 @@ def img_inpaint_or_outpaint(
         outpaint_distance_right = -1,
         outpaint_distance_top = -1,
         outpaint_distance_bottom = -1,
-        image_prompts = []
+        image_prompts = [],
+        performance_selection= performance_selection,
+        guidance_scale=req_obj.guidance_scale
     )
 
     req.input_image = base64_to_stream(req.input_image)
@@ -327,13 +358,15 @@ def img_inpaint_or_outpaint(
         first_element = primary_response[0]
     else:
         first_element = None  # or handle accordingly
-    # output_image_url = remove_baseUrl(first_element.url)
-    # local_output_image_path = "/home/Foocus_ObjectReplace/outputs" + remove_baseUrl(first_element.url)
+    output_image_url = remove_baseUrl(first_element.url)
+    local_output_image_path = f"/home{user_directory}fooocus_ai_background/outputs" + remove_baseUrl(first_element.url)
 
-    # new_out_images_directory_name = '/object_replace_images/'
-    # new_local_out_image_directory = get_save_img_directory(new_out_images_directory_name)
-    # new_local_out_image_path =  new_local_out_image_directory + output_image_url
-    # move_file(local_output_image_path,new_local_out_image_directory)
+    # local_output_image_path = "/home/fooocus_ai_background/outputs" + remove_baseUrl(first_element.url)
+
+    new_out_images_directory_name = '/object_replace_images/'
+    new_local_out_image_directory = get_save_img_directory(new_out_images_directory_name)
+    new_local_out_image_path =  new_local_out_image_directory + output_image_url
+    move_file(local_output_image_path,new_local_out_image_directory)
 
     response_data = {
         "success": True,
@@ -367,13 +400,16 @@ def get_save_img_directory(directory_name):
     return img_directory
 
 
+
+
+
 @secure_router.post(
-        path="/v2/generation/image-inpaint-outpaint",
+        path="/v2/generation/image-inpaint-outpaint-expand",
         response_model=List[GeneratedImageResult] | AsyncJobResponse,
         responses=img_generate_responses,
         tags=["GenerateV2"])
 def img_Expand(
-    req: ImgInpaintOrOutpaintRequestJson,
+    req_obj: AiExpand,
     accept: str = Header(None),
     accept_query: str | None = Query(
         None, alias='accept',
@@ -390,6 +426,17 @@ def img_Expand(
     if accept_query is not None and len(accept_query) > 0:
         accept = accept_query
 
+    req = ImgInpaintOrOutpaintRequestJson(
+        input_image = req_obj.image,
+        outpaint_selections = [OutpaintExpansion("Left"),OutpaintExpansion("Right"),OutpaintExpansion("Top"),OutpaintExpansion("Bottom") ],
+        outpaint_distance_left = -1,
+        outpaint_distance_right = -1,
+        outpaint_distance_top = -1,
+        outpaint_distance_bottom = -1,
+    )
+
+
+    
     req.input_image = base64_to_stream(req.input_image)
     if req.input_mask is not None:
         req.input_mask = base64_to_stream(req.input_mask)
@@ -408,6 +455,12 @@ def img_Expand(
     req.image_prompts = image_prompts_files
 
     return call_worker(req, accept)
+
+
+
+
+
+
 
 @secure_router.post(
         path="/v2/generation/image-prompt",

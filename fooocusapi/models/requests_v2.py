@@ -54,6 +54,12 @@ class BackgroundGeneration(BaseModel):
     steps: str = Field(default="quality")
 
 
+class AiExpand(BaseModel):
+    image: str = Field('',  description="Init image for inpaint or outpaint as base64")
+    top: int = Field(-1, description= "put a value")
+    bottom: int = Field(-1, description= "put a value")
+    left: int = Field(-1, description= "put a value")
+    right: int = Field(-1, description= "put a value")
 
 
 
