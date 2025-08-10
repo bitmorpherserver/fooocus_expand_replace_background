@@ -465,10 +465,32 @@ def img_Expand(
         image_prompts_files.append(default_image_prompt)
     req.image_prompts = image_prompts_files
 
-    return call_worker(req, accept)
+
+    
+    primary_response = call_worker(req, accept)
+
+    if primary_response:
+        first_element = primary_response[0]
+    else:
+        first_element = None  # or handle accordingly
+    output_image_url = remove_baseUrl(first_element.url)
+    local_output_image_path = f"/home/fooocus_expand_replace_background/outputs" + remove_baseUrl(first_element.url)
+
+    new_out_images_directory_name = '/ai_expand_images/'
+    new_local_out_image_directory = get_save_img_directory(new_out_images_directory_name)
+    new_local_out_image_path =  new_local_out_image_directory + output_image_url
+    move_file(local_output_image_path,new_local_out_image_directory)
+
+    response_data = {
+        "success": True,
+        "message": "Returned output successfully",
+        "output_image_url": '/media' + new_out_images_directory_name + new_local_out_image_path.split('/')[-1],
+        "server_process_time": server_process_time["preprocess_time"] + server_process_time["processing_time"]
+    
+    }
 
 
-
+    return JSONResponse(content=response_data, status_code=200)
 
 
 
