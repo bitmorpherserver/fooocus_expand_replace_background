@@ -54,7 +54,15 @@ class BackgroundGeneration(BaseModel):
     steps: str = Field(default="quality")
 
 
-class AiExpand(BaseModel):
+class AiLogoExpand(BaseModel):
+    image: str = Field('',  description="Init image for inpaint or outpaint as base64")
+    top: int = Field(-1, description= "put a value")
+    bottom: int = Field(-1, description= "put a value")
+    left: int = Field(-1, description= "put a value")
+    right: int = Field(-1, description= "put a value")
+    prompt: str = Field('a seamless, minimalist background with a smooth gradient that softly blends into the previous background color, fluid color transitions, harmonious tones, soft edges, abstract color wash, subtle digital gradient, no objects, high-resolution, calming and cohesive design', description="Enter prompt")
+
+class AiImgExpand(BaseModel):
     image: str = Field('',  description="Init image for inpaint or outpaint as base64")
     top: int = Field(-1, description= "put a value")
     bottom: int = Field(-1, description= "put a value")

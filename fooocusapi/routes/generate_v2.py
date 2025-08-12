@@ -28,7 +28,7 @@ from fooocusapi.models.requests_v2 import (
     ImageEnhanceRequestJson, ImgInpaintOrOutpaintRequestJson,
     ImgPromptRequestJson,
     Text2ImgRequestWithPrompt,
-    OutpaintExpansion,AiExpand,
+    OutpaintExpansion,AiLogoExpand,AiImgExpand,
     ImgUpscaleOrVaryRequestJson, ObjectReplaceRequestJson, BackgroundGeneration
 )
 from fooocusapi.models.common.response import (
@@ -401,16 +401,16 @@ def get_save_img_directory(directory_name):
 
 
 
-
+#AI Logo Expand
 
 @secure_router.post(
         # path="/v2/generation/image-inpaint-outpaint-expand",
-        path="/ai/api/v1/ai_expand",
+        path="/ai/api/v1/ai_logo_expand",
         response_model=List[GeneratedImageResult] | AsyncJobResponse,
         responses=img_generate_responses,
         tags=["GenerateV2"])
 def img_Expand(
-    req_obj: AiExpand,
+    req_obj: AiLogoExpand,
     accept: str = Header(None),
     accept_query: str | None = Query(
         None, alias='accept',
@@ -444,6 +444,7 @@ def img_Expand(
         outpaint_distance_right = req_obj.right,
         outpaint_distance_top = req_obj.top,
         outpaint_distance_bottom = req_obj.bottom,
+        prompt = req_obj.prompt,
     )
 
 
@@ -476,7 +477,7 @@ def img_Expand(
     output_image_url = remove_baseUrl(first_element.url)
     local_output_image_path = f"/home/fooocus_expand_replace_background/outputs" + remove_baseUrl(first_element.url)
 
-    new_out_images_directory_name = '/ai_expand_images/'
+    new_out_images_directory_name = '/ai_logo_expand_images/'
     new_local_out_image_directory = get_save_img_directory(new_out_images_directory_name)
     new_local_out_image_path =  new_local_out_image_directory + output_image_url
     move_file(local_output_image_path,new_local_out_image_directory)
@@ -492,7 +493,90 @@ def img_Expand(
 
     return JSONResponse(content=response_data, status_code=200)
 
+#AI Normal Image Expand
 
+@secure_router.post(
+    # path="/v2/generation/image-inpaint-outpaint-expand",
+    path="/ai/api/v1/ai_img_expand",
+    response_model=List[GeneratedImageResult] | AsyncJobResponse,
+    responses=img_generate_responses,
+    tags=["GenerateV2"])
+def img_Expand(
+        req_obj: AiImgExpand,
+        accept: str = Header(None),
+        accept_query: str | None = Query(
+            None, alias='accept',
+            description="Parameter to override 'Accept' header, 'image/png' for output bytes")):
+    """\nInpaint or outpaint\n
+    Inpaint or outpaint
+    Arguments:
+        req {ImgInpaintOrOutpaintRequestJson} -- Request body
+        accept {str} -- Accept header
+        accept_query {str} -- Parameter to override 'Accept' header, 'image/png' for output bytes
+    Returns:
+        Response -- img_generate_responses
+    """
+    if accept_query is not None and len(accept_query) > 0:
+        accept = accept_query
+    outpaint_selections = []
+    if (req_obj.left != -1) and (req_obj.left != 0):
+        outpaint_selections.append(OutpaintExpansion("Left"))
+    if (req_obj.right != -1) and (req_obj.right != 0):
+        outpaint_selections.append(OutpaintExpansion("Right"))
+    if (req_obj.top != -1) and (req_obj.top != 0):
+        outpaint_selections.append(OutpaintExpansion("Top"))
+    if (req_obj.bottom != -1) and (req_obj.bottom != 0):
+        outpaint_selections.append(OutpaintExpansion("Bottom"))
+
+    req = ImgInpaintOrOutpaintRequestJson(
+        input_image=req_obj.image,
+        outpaint_selections=outpaint_selections,
+        outpaint_distance_left=req_obj.left,
+        outpaint_distance_right=req_obj.right,
+        outpaint_distance_top=req_obj.top,
+        outpaint_distance_bottom=req_obj.bottom,
+    )
+
+    req.input_image = base64_to_stream(req.input_image)
+    if req.input_mask is not None:
+        req.input_mask = base64_to_stream(req.input_mask)
+    default_image_prompt = ImagePrompt(cn_img=None)
+    image_prompts_files: List[ImagePrompt] = []
+    for image_prompt in req.image_prompts:
+        image_prompt.cn_img = base64_to_stream(image_prompt.cn_img)
+        image = ImagePrompt(
+            cn_img=image_prompt.cn_img,
+            cn_stop=image_prompt.cn_stop,
+            cn_weight=image_prompt.cn_weight,
+            cn_type=image_prompt.cn_type)
+        image_prompts_files.append(image)
+    while len(image_prompts_files) <= 4:
+        image_prompts_files.append(default_image_prompt)
+    req.image_prompts = image_prompts_files
+
+    primary_response = call_worker(req, accept)
+
+    if primary_response:
+        first_element = primary_response[0]
+    else:
+        first_element = None  # or handle accordingly
+    output_image_url = remove_baseUrl(first_element.url)
+    local_output_image_path = f"/home/fooocus_expand_replace_background/outputs" + remove_baseUrl(first_element.url)
+
+    new_out_images_directory_name = '/ai_img_expand_images/'
+    new_local_out_image_directory = get_save_img_directory(new_out_images_directory_name)
+    new_local_out_image_path = new_local_out_image_directory + output_image_url
+    move_file(local_output_image_path, new_local_out_image_directory)
+
+    response_data = {
+        "success": True,
+        "message": "Returned output successfully",
+        "output_image_url": '/media' + new_out_images_directory_name + new_local_out_image_path.split('/')[-1],
+        "server_process_time": server_process_time["preprocess_time"] + server_process_time["processing_time"]
+
+    }
+
+    return JSONResponse(content=response_data, status_code=200)
 
 
 @secure_router.post(
